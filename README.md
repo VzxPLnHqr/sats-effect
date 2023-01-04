@@ -22,29 +22,23 @@ only consists of this readme file.
 
 ## Get intimate with your sats!
 
-An example of what we are thinking might be helpful:
+### The core abstraction
 
-```scala
+```
+type Bitcoin[A] = IO[A]  
+// the above type can be refined later to build out a bitocin-specific 
+// IO-like monad. For now we just use cats-effect.IO under the hood.
 
-import sats-effect._
+// a SatsApp is a function which takes a (possibly infinite) stream of bitcoin 
+// outputs and "does something" with this information thereby producing another 
+// stream of effects. Effects can be pretty much anything, including signing
+// and broadcasting bitcoin transactions.
+// 
+// This allows wallets to be defined as immutable values (programs).
+type SatsApp[F[_], A] = Stream[Bitcoin, Output] => Stream[F, A]
 
-object TipJar extends SatsApp.SelfHosted(bitcoind="localhost:...", wallet="...") {
-
-    /**
-     * Our "run" function provides you with an `fs2.Stream` of satoshis where
-     * the sats are delivered to you within a Bitcoin context. Now you just need
-     * to decide what to do with them!
-     * */
-    def run(satsIn: Stream[Bitcoin,NonEmptySet[Satoshi]]) = 
-        satsIn.evalMap(hodl)
-
-    /**
-     * take any sats and put them in a hodl wallet. Can get necessary wallet
-     * info to do so from the runtime: `Bitcoin.wallet.deposit(sats)`
-     * */
-    def hodl(sats: NonEmptySet[Satoshi]): Bitcoin[Unit] = ???
-}
-
+// a trival example of a SatsApp
+val hodl: SatsApp[Id,Unit] = satsIn => Stream.empty
 ```
 
 
