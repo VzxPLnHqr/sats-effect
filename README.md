@@ -41,5 +41,39 @@ type SatsApp[F[_], A] = Stream[Bitcoin, Output] => Stream[F, A]
 val hodl: SatsApp[Id,Unit] = satsIn => Stream.empty
 ```
 
+Or a different approach might be:
+
+```scala
+
+val allOutputs: Stream[Bitcoin,Output] = Bitcoin.outputs
+
+given myOutputDescriptor: OutputDescriptor = ??? 
+
+val myOutputs: Stream[Bitcoin,Output] = allOutputs.filter(_.mine)
+
+val myDust: Stream[Bitcoin,Output] = myOutputs.filter(_.amount <= Bitcoin.DUST_LIMIT)
+
+// note: this is just an example. Do not do this. It is bad for privacy.
+myDust.foldLeft(List.empty[Output]){
+    case (accumulatedDustOutputs, lastDustOutput) =
+        // donate dust whenever accumulating more than 100000 sats worth 
+        if( accumulatedDustOutputs.sum >= Satoshi(100000) ) 
+            accumulatedDustOutputs.sendTo(...)
+            List.empty
+        else
+            lastDustOutput :: accumulatedDustOutputs
+}
+
+// the above can be made to work because we provide some extension methods
+// on top of the data primitives offered by scoin
+extension (output: Output) {
+    def mine(using descriptor: OutputDescriptor): Boolean = descriptor.contains(output)
+}
+
+extension [F[_]: Traversable](outputs: F[Output]) {
+    def sum: Satoshi = Satoshi(outputs.map(_.amount.toLong).sum)
+    def sendTo(descriptor: OutputDescriptor)(using SigningWallet) = ???
+}
+```
 
 
