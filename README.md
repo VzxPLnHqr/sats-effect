@@ -4,76 +4,37 @@ Like [cats-effect](https://typelevel.org/cats-effect) but for bitcoin.
 Built with [fiatjaf/scoin](https://github.com/fiatjaf/scoin) under the hood.
 
 ## Motivation
+
 ### Programmer Perspective
+
 Purely functional programming is hard to get used to. However, once you are used
 to it, it is difficult to go back to a more imperative style. This is because you
 begin to take things like referential transparency for granted, and you have become
-accustomed to pure functions, capturing side-effects in a context, composing, etc.
+accustomed to pure functions, capturing side-effects in a context, and
+**mathematically law-abiding data structures!**
 
 ### Bitcoiner Perspective
+
 The bitcoin protocol provides many benefits for its users such as censorship-resistance.
 If you are reading this, you probably already know of these benefits. However, 
 interacting with your precious sats, such as receiving them, directing or redirecting them,
 and especially if you want to do these things privately while maintaining best practices
 is difficult, to say the least.
 
-This library is (rather, will be) here to help! (note: right now the "library" 
-only consists of this readme file.
+This library is (rather, will be) here to help!
 
-## Get intimate with your sats!
+> **note: right now the "library" only consists of this readme file.**
 
-### The core abstraction
+### The Core Abstraction - Work, and Proof Thereof
 
-```
-type Bitcoin[A] = IO[A]  
-// the above type can be refined later to build out a bitocin-specific 
-// IO-like monad. For now we just use cats-effect.IO under the hood.
+Sometimes we need to abstract away the details so that we can see clearly what
+is going on. Bitcoin is a network, a currency, and many other things to many 
+people. However, we believe the core innovation that bitcoin brings to the world 
+is manifest mostly via its self-regulating proof-of-work adjustment algorithm.
 
-// a SatsApp is a function which takes a (possibly infinite) stream of bitcoin 
-// outputs and "does something" with this information thereby producing another 
-// stream of effects. Effects can be pretty much anything, including signing
-// and broadcasting bitcoin transactions.
-// 
-// This allows wallets to be defined as immutable values (programs).
-type SatsApp[F[_], A] = Stream[Bitcoin, Output] => Stream[F, A]
+Without proof of work (`PoW`), Bitcoin begins to lose two of the core properties bitcoiners
+care about most:
+1. censorship resistance
+2. eventual immutability
 
-// a trival example of a SatsApp
-val hodl: SatsApp[Id,Unit] = satsIn => Stream.empty
-```
-
-Or a different approach might be:
-
-```scala
-
-val allOutputs: Stream[Bitcoin,Output] = Bitcoin.outputs
-
-given myOutputDescriptor: OutputDescriptor = ??? 
-
-val myOutputs: Stream[Bitcoin,Output] = allOutputs.filter(_.mine)
-
-val myDust: Stream[Bitcoin,Output] = myOutputs.filter(_.amount <= Bitcoin.DUST_LIMIT)
-
-// note: this is just an example. Do not do this. It is bad for privacy.
-myDust.foldLeft(List.empty[Output]){
-    case (accumulatedDustOutputs, lastDustOutput) =
-        // donate dust whenever accumulating more than 100000 sats worth 
-        if( accumulatedDustOutputs.sum >= Satoshi(100000) ) 
-            accumulatedDustOutputs.sendTo(...)
-            List.empty
-        else
-            lastDustOutput :: accumulatedDustOutputs
-}
-
-// the above can be made to work because we provide some extension methods
-// on top of the data primitives offered by scoin
-extension (output: Output) {
-    def mine(using descriptor: OutputDescriptor): Boolean = descriptor.contains(output)
-}
-
-extension [F[_]: Traversable](outputs: F[Output]) {
-    def sum: Satoshi = Satoshi(outputs.map(_.amount.toLong).sum)
-    def sendTo(descriptor: OutputDescriptor)(using SigningWallet) = ???
-}
-```
-
-
+We need a `PoW` monad!
